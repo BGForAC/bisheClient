@@ -1,0 +1,6 @@
+Vector3 = CS.UnityEngine.Vector3
+GameObject = CS.UnityEngine.GameObject
+Instantiate = CS.UnityEngine.Object.Instantiate
+Time = CS.UnityEngine.Time
+WebSocketClient = CS.WebSocketClient
+Resources = CS.UnityEngine.Resources

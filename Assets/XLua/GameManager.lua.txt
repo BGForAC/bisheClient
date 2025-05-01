@@ -1,0 +1,92 @@
+local currentObject = nil
+
+GameManager = {}
+
+GameManager.grid = {}
+GameManager.WIDTH = 10
+GameManager.HEIGHT = 22
+
+GameManager.score = 0
+
+GameManager.txtScoreObj = nil
+
+local birthPoint = Vector3(GameManager.WIDTH / 2, GameManager.HEIGHT, 0)
+
+function init()
+    for i = 1, GameManager.WIDTH do
+        GameManager.grid[i] = {}
+    end
+    GameManager.generateNewBlock()
+
+    --获取tag为"score"的物体
+    GameManager.txtScoreObj = GameObject.FindGameObjectWithTag("score")
+end
+
+function GameManager.generateNewBlock()
+    currentObject = Teris.New(birthPoint)
+end
+
+function moveLeft()
+    currentObject:moveLeft()
+end
+
+function moveRight()
+    currentObject:moveRight()
+end
+
+function rotate()
+    currentObject:rotate()
+end
+
+function drop()
+    currentObject:drop()
+end
+
+function cancelDrop()
+    currentObject:cancelDrop()
+end
+
+function update()
+    currentObject:update()
+end
+
+function GameManager.UpdateScore(lineCount)
+    if lineCount == 1 then
+        GameManager.score = GameManager.score + 100
+    elseif lineCount == 2 then
+        GameManager.score = GameManager.score + 300
+    elseif lineCount == 3 then
+        GameManager.score = GameManager.score + 500
+    elseif lineCount == 4 then
+        GameManager.score = GameManager.score + 800
+    end
+    --更新分数显示
+    GameManager.txtScoreObj:GetComponent("Text").text = "Score: " .. GameManager.score
+end
+
+function GameManager.CheckRow(row)
+    for x = 1, GameManager.WIDTH do
+        if GameManager.grid[x][row] == nil then
+            return false
+        end
+    end 
+    GameManager.ClearRow(row)
+    return true
+end
+
+function GameManager.ClearRow(row)
+    WebSocketClient.Send("clear row" .. row)
+    for y = row, GameManager.HEIGHT do
+        for x = 1, GameManager.WIDTH do
+            if y == row then
+                CS.UnityEngine.Object.Destroy(GameManager.grid[x][y].gameObject)
+            end
+            GameManager.grid[x][y] = GameManager.grid[x][y + 1]
+            if GameManager.grid[x][y] ~= nil then
+                GameManager.grid[x][y].transform.position = GameManager.grid[x][y].transform.position + Vector3(0, -1, 0)
+            end
+        end
+    end
+end
+
+return GameManager

@@ -1,0 +1,159 @@
+Teris = {}
+
+-- Teris类用于创建和管理俄罗斯方块的行为和状态
+-- 该类包含了方块的生成、移动、旋转、下落等功能
+-- 以及与游戏网格的交互
+
+local FAST = 0.1
+local SLOW = 0.5
+local isDropping = false
+
+function Teris:currentDropSpeed()
+    -- 获取当前的下落速度
+    if isDropping then
+        return FAST
+    else
+        return SLOW
+    end
+end
+
+local dropTimer = Teris:currentDropSpeed()
+
+function Teris.New(birthPoint)
+    local self = {}
+    setmetatable(self, {__index = Teris})
+
+    -- 生成一个新的方块
+    -- 通过访问Resources文件夹中的预制体来创建一个新的方块
+    local prefab = Resources.Load("Prefabs/" .. Teris.generateRandomBlockName())
+    self.gameObject = Instantiate(prefab)
+    self.transform = self.gameObject.transform
+    self.transform.position = birthPoint
+
+    return self 
+end
+
+local blockNames = {"Teris_T", "Teris_Z", "Teris_S", "Teris_L", "Teris_J", "Teris_O", "Teris_I"}
+function Teris.generateRandomBlockName()
+    -- 随机选择一个方块名称
+    local randomIndex = math.random(1, #blockNames)
+    WebSocketClient.Send(randomIndex)
+    return blockNames[randomIndex]
+end
+
+function Teris:moveLeft()
+    -- 移动方块到左边
+    self.transform.position = self.transform.position + Vector3(-1, 0, 0)
+    -- 检查是否可以移动
+    if not self:MoveAble() then
+        -- 如果不能移动，则将方块移回原来的位置
+        self.transform.position = self.transform.position + Vector3(1, 0, 0)
+    else
+        WebSocketClient.Send("left")
+    end 
+end
+
+function Teris:moveRight()
+    -- 移动方块到右边
+    self.transform.position = self.transform.position + Vector3(1, 0, 0)
+    -- 检查是否可以移动
+    if not self:MoveAble() then
+        -- 如果不能移动，则将方块移回原来的位置
+        self.transform.position = self.transform.position + Vector3(-1, 0, 0)
+    else
+        WebSocketClient.Send("right")
+    end
+end
+
+function Teris:rotate()
+    -- 旋转方块
+    self.transform:Rotate(0, 0, 90)
+    -- 检查是否可以旋转
+    if not self:MoveAble() then
+        -- 如果不能旋转，则将方块旋转回原来的角度
+        self.transform:Rotate(0, 0, -90)
+    else
+        WebSocketClient.Send("rotate")
+    end
+end
+
+function Teris:drop()
+    isDropping = true
+end
+
+function Teris:cancelDrop()
+    isDropping = false
+end
+
+function Teris:update()
+    dropTimer = dropTimer - Time.deltaTime
+    if dropTimer <= 0 then
+        -- 每隔一段时间下落一次
+        self.transform.position = self.transform.position + Vector3(0, -1, 0)
+        dropTimer = self:currentDropSpeed()
+    end
+    -- 检查是否可以下落
+    if not self:MoveAble() then
+        -- 如果不能下落，则将方块移回原来的位置
+        self.transform.position = self.transform.position + Vector3(0, 1, 0)
+        -- 将方块固定在网格上
+        self:onLand()
+    end
+end
+
+function Teris:onLand()
+    WebSocketClient.Send("land")
+    local checkedRows = {}
+    -- 遍历子物体
+    for i = 0, self.transform.childCount - 1 do
+        local child = self.transform:GetChild(i)
+        local x = math.floor(child.position.x + 0.5)
+        local y = math.floor(child.position.y + 0.5)
+
+        table.insert(checkedRows, y)
+        -- 将方块添加到网格中
+        GameManager.grid[x][y] = child.gameObject
+    end
+
+    -- 将checkedRows降序排列
+    table.sort(checkedRows, function(a, b) return a > b end)
+    local clearedRowNum = 0
+    -- 遍历检查的行
+    for i = 1, #checkedRows do
+        local row = checkedRows[i]
+        -- 检查行是否满了
+        if GameManager.CheckRow(row) then
+            clearedRowNum = clearedRowNum + 1
+        end
+    end
+
+    if clearedRowNum > 0 then
+        -- 如果有行被消除，则更新分数
+        GameManager.UpdateScore(clearedRowNum)
+    end
+
+    -- 生成新的方块
+    GameManager.generateNewBlock()
+end
+
+function Teris:MoveAble()
+    -- 遍历子物体
+    for i = 0, self.transform.childCount - 1 do
+        local child = self.transform:GetChild(i)
+        local x = math.floor(child.position.x + 0.5)
+        local y = math.floor(child.position.y + 0.5)
+
+        -- 检查是否越界
+        if x < 1 or x > GameManager.WIDTH or y < 1 then
+            return false
+        end
+
+        -- 检查是否与其他方块重叠
+        if GameManager.grid[x][y] ~= nil then
+            return false
+        end
+    end
+    return true
+end
+
+return Teris
