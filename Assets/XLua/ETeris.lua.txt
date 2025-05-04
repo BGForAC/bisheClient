@@ -1,0 +1,57 @@
+ETeris = {}
+
+-- ETeris类用于创建和管理对方的俄罗斯方块的行为和状态
+-- 该类包含了方块的生成、移动、旋转、下落等功能
+-- 以及与游戏网格的交互
+
+
+local blockNames = {"Teris_T", "Teris_Z", "Teris_S", "Teris_L", "Teris_J", "Teris_O", "Teris_I"}
+function ETeris.New(num, birthPoint, parentName)
+    local self = {}
+    setmetatable(self, {__index = ETeris})
+
+    -- 生成一个新的方块
+    -- 通过访问Resources文件夹中的预制体来创建一个新的方块
+    local prefab = Resources.Load("Prefabs/" .. blockNames[num])
+    self.gameObject = Instantiate(prefab)
+    self.transform = self.gameObject.transform
+    self.transform.position = birthPoint
+    local parent = GameObject.Find(parentName)
+    self.transform.parent = parent.transform
+
+    return self 
+end
+
+function ETeris:moveLeft()
+    -- 移动方块到左边
+    self.transform.position = self.transform.position + Vector3(-1, 0, 0)
+end
+
+function ETeris:moveRight()
+    -- 移动方块到右边
+    self.transform.position = self.transform.position + Vector3(1, 0, 0)
+end
+
+function ETeris:rotate()
+    -- 旋转方块
+    self.transform:Rotate(0, 0, 90)
+end
+
+function ETeris:drop()
+    self.transform.position = self.transform.position + Vector3(0, -1, 0)
+end
+
+function ETeris:onLand()
+    EGameManager.clearCurrentObject()
+    -- 遍历子物体
+    for i = 0, self.transform.childCount - 1 do
+        local child = self.transform:GetChild(i)
+        local x = math.floor(child.position.x + 0.5) - 60
+        local y = math.floor(child.position.y + 0.5) - 30
+
+        -- 将方块添加到网格中
+        EGameManager.grid[x][y] = child.gameObject
+    end
+end
+
+return ETeris

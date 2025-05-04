@@ -1,0 +1,96 @@
+local currentObject = nil
+
+EGameManager = {}
+
+EGameManager.grid = {}
+EGameManager.WIDTH = 10
+EGameManager.HEIGHT = 22
+
+EGameManager.score = 0
+
+EGameManager.txtScoreObj = nil
+
+local birthPoint = Vector3(EGameManager.WIDTH / 2 + 60, EGameManager.HEIGHT + 30, 60)
+
+function eInit()
+    for i = 1, EGameManager.WIDTH do
+        EGameManager.grid[i] = {}
+    end
+
+    --获取tag为"score"的物体
+    EGameManager.txtScoreObj = GameObject.FindGameObjectWithTag("score")
+end
+
+function EGameManager.clearCurrentObject()
+    currentObject = nil
+end
+
+function eGenerateNewBlock()
+    currentObject = ETeris.New(WebSocketClient.eBlockNumber, birthPoint, "EBlocks")
+end
+
+function eMoveLeft()
+    if currentObject == nil then
+        return
+    end
+    currentObject:moveLeft()
+end
+
+function eMoveRight()
+    if currentObject == nil then
+        return
+    end
+    currentObject:moveRight()
+end
+
+function eRotate()
+    if currentObject == nil then
+        return
+    end
+    currentObject:rotate()
+end
+
+function eDrop()
+    if currentObject == nil then
+        return
+    end
+    currentObject:drop()
+end
+
+function eOnLand()
+    if currentObject == nil then
+        return
+    end
+    currentObject:onLand()
+end
+
+function updateScore(lineCount)
+    if lineCount == 1 then
+        EGameManager.score = EGameManager.score + 100
+    elseif lineCount == 2 then
+        EGameManager.score = EGameManager.score + 300
+    elseif lineCount == 3 then
+        EGameManager.score = EGameManager.score + 500
+    elseif lineCount == 4 then
+        EGameManager.score = EGameManager.score + 800
+    end
+    --更新分数显示
+    EGameManager.txtScoreObj:GetComponent("Text").text = "Score: " .. EGameManager.score
+end
+
+function eClearRow()
+    local row = WebSocketClient.eRowNumber
+    for y = tonumber(row), EGameManager.HEIGHT do
+        for x = 1, EGameManager.WIDTH do
+            if y == row then
+                CS.UnityEngine.Object.Destroy(EGameManager.grid[x][y].gameObject)
+            end
+            EGameManager.grid[x][y] = EGameManager.grid[x][y + 1]
+            if EGameManager.grid[x][y] ~= nil then
+                EGameManager.grid[x][y].transform.position = EGameManager.grid[x][y].transform.position + Vector3(0, -1, 0)
+            end
+        end
+    end
+end
+
+return EGameManager

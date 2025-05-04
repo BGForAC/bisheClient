@@ -16,37 +16,58 @@ function init()
     for i = 1, GameManager.WIDTH do
         GameManager.grid[i] = {}
     end
-    GameManager.generateNewBlock()
 
     --获取tag为"score"的物体
     GameManager.txtScoreObj = GameObject.FindGameObjectWithTag("score")
 end
 
-function GameManager.generateNewBlock()
-    currentObject = Teris.New(birthPoint)
+function GameManager.clearCurrentObject()
+    currentObject = nil
+end
+
+function generateNewBlock()
+    currentObject = Teris.New(WebSocketClient.blockNumber, birthPoint, "Blocks")
 end
 
 function moveLeft()
+    if currentObject == nil then
+        return
+    end
     currentObject:moveLeft()
 end
 
 function moveRight()
+    if currentObject == nil then
+        return
+    end
     currentObject:moveRight()
 end
 
 function rotate()
+    if currentObject == nil then
+        return
+    end
     currentObject:rotate()
 end
 
 function drop()
+    if currentObject == nil then
+        return
+    end
     currentObject:drop()
 end
 
 function cancelDrop()
+    if currentObject == nil then
+        return
+    end
     currentObject:cancelDrop()
 end
 
 function update()
+    if currentObject == nil then
+        return
+    end
     currentObject:update()
 end
 
@@ -75,7 +96,6 @@ function GameManager.CheckRow(row)
 end
 
 function GameManager.ClearRow(row)
-    WebSocketClient.Send("clear row" .. row)
     for y = row, GameManager.HEIGHT do
         for x = 1, GameManager.WIDTH do
             if y == row then

@@ -19,26 +19,21 @@ end
 
 local dropTimer = Teris:currentDropSpeed()
 
-function Teris.New(birthPoint)
+local blockNames = {"Teris_T", "Teris_Z", "Teris_S", "Teris_L", "Teris_J", "Teris_O", "Teris_I"}
+function Teris.New(num, birthPoint, parentName)
     local self = {}
     setmetatable(self, {__index = Teris})
 
     -- 生成一个新的方块
     -- 通过访问Resources文件夹中的预制体来创建一个新的方块
-    local prefab = Resources.Load("Prefabs/" .. Teris.generateRandomBlockName())
+    local prefab = Resources.Load("Prefabs/" .. blockNames[num])
     self.gameObject = Instantiate(prefab)
     self.transform = self.gameObject.transform
     self.transform.position = birthPoint
+    local parent = GameObject.Find(parentName)
+    self.transform.parent = parent.transform
 
     return self 
-end
-
-local blockNames = {"Teris_T", "Teris_Z", "Teris_S", "Teris_L", "Teris_J", "Teris_O", "Teris_I"}
-function Teris.generateRandomBlockName()
-    -- 随机选择一个方块名称
-    local randomIndex = math.random(1, #blockNames)
-    WebSocketClient.Send(randomIndex)
-    return blockNames[randomIndex]
 end
 
 function Teris:moveLeft()
@@ -91,18 +86,21 @@ function Teris:update()
         -- 每隔一段时间下落一次
         self.transform.position = self.transform.position + Vector3(0, -1, 0)
         dropTimer = self:currentDropSpeed()
-    end
-    -- 检查是否可以下落
-    if not self:MoveAble() then
-        -- 如果不能下落，则将方块移回原来的位置
-        self.transform.position = self.transform.position + Vector3(0, 1, 0)
-        -- 将方块固定在网格上
-        self:onLand()
+        -- 检查是否可以下落
+        if not self:MoveAble() then
+            -- 如果不能下落，则将方块移回原来的位置
+            self.transform.position = self.transform.position + Vector3(0, 1, 0)
+            -- 将方块固定在网格上
+            self:onLand()
+        else
+            WebSocketClient.Send("drop")
+        end
     end
 end
 
 function Teris:onLand()
     WebSocketClient.Send("land")
+    GameManager.clearCurrentObject()
     local checkedRows = {}
     -- 遍历子物体
     for i = 0, self.transform.childCount - 1 do
@@ -128,12 +126,13 @@ function Teris:onLand()
     end
 
     if clearedRowNum > 0 then
+        WebSocketClient.Send("clear")
         -- 如果有行被消除，则更新分数
         GameManager.UpdateScore(clearedRowNum)
     end
 
     -- 生成新的方块
-    GameManager.generateNewBlock()
+    WebSocketClient.Send("gen")
 end
 
 function Teris:MoveAble()
