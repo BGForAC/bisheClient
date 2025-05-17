@@ -7,6 +7,7 @@ Teris = {}
 local FAST = 0.1
 local SLOW = 0.5
 local isDropping = false
+local gameOver = false
 
 function Teris:currentDropSpeed()
     -- 获取当前的下落速度

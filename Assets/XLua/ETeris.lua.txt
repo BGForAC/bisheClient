@@ -4,6 +4,7 @@ ETeris = {}
 -- 该类包含了方块的生成、移动、旋转、下落等功能
 -- 以及与游戏网格的交互
 
+local gameOver = false
 
 local blockNames = {"Teris_T", "Teris_Z", "Teris_S", "Teris_L", "Teris_J", "Teris_O", "Teris_I"}
 function ETeris.New(num, birthPoint, parentName)

@@ -25,6 +25,9 @@ public class WebSocketClient : MonoBehaviour
                         blockNumber = int.Parse(message.Substring(6));
                         GameManager.GenerateNewBlock();
                         break;
+                    case "gameOver":
+                        GameManager.GameOver()
+                        break;
                     case string message when message.StartsWith("e "):
                         reactTo(message.Substring(2));
                         break;
@@ -37,6 +40,9 @@ public class WebSocketClient : MonoBehaviour
                 {
                     switch (message)
                     {
+                        case "gameOver":
+                            GameManager.EGameOver();
+                            break;
                         case "moveLeft":
                             GameManager.EMoveLeft();
                             break;

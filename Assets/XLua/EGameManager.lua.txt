@@ -1,4 +1,5 @@
 local currentObject = nil
+local clearedRowNum = 0
 
 EGameManager = {}
 
@@ -18,7 +19,7 @@ function eInit()
     end
 
     --获取tag为"score"的物体
-    EGameManager.txtScoreObj = GameObject.FindGameObjectWithTag("score")
+    EGameManager.txtScoreObj = GameObject.FindGameObjectWithTag("eScore")
 end
 
 function EGameManager.clearCurrentObject()
@@ -26,6 +27,8 @@ function EGameManager.clearCurrentObject()
 end
 
 function eGenerateNewBlock()
+    updateScore(clearedRowNum)
+    clearedRowNum = 0
     currentObject = ETeris.New(WebSocketClient.eBlockNumber, birthPoint, "EBlocks")
 end
 
@@ -91,6 +94,7 @@ function eClearRow()
             end
         end
     end
+    clearedRowNum = clearedRowNum + 1
 end
 
 return EGameManager
