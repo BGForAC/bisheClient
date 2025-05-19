@@ -15,6 +15,16 @@ using System.Linq;
 //配置的详细介绍请看Doc下《XLua的配置.doc》
 public static class ExampleConfig
 {
+    [CSharpCallLua]
+    public static List<Type> CSharpCallLua = new List<Type>()
+    {
+        typeof(Action),
+        typeof(Action<string>),
+        typeof(Action<string, int>),
+        typeof(Action<string, string[]>),
+        typeof(UnityEngine.Events.UnityAction)
+    };
+
     /***************如果你全lua编程，可以参考这份自动化配置***************/
     //--------------begin 纯lua编程配置参考----------------------------
     //static List<string> exclude = new List<string> {

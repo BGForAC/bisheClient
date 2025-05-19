@@ -1,112 +1,245 @@
-local currentObject = nil
-
 GameManager = {}
 
-GameManager.grid = {}
-GameManager.WIDTH = 10
-GameManager.HEIGHT = 22
+local games = {}
 
-GameManager.score = 0
+local opponentsOffset = {Vector3(60, 40, 60), Vector3(60, 0, 60), Vector3(60, -35, 60)}
+local opponentsScoreObjectName = {"Score1", "Score2", "Score3"}
+local opponentsBlockObjectName = {"Block1", "Block2", "Block3"}
+local gameOverUIObjectName = {"GameOverUI1", "GameOverUI2", "GameOverUI3"}
+GameManager.opponentsId = {}
+GameManager.scores = {}
+function init(playerId, opponentsId)
+    -- 初始化游戏
+    local terisGame = GameObject.Find("TerisGame")
+    GameManager.terisGame = terisGame
+    terisGame.transform:Find("Frames").gameObject:SetActive(true)
 
-GameManager.txtScoreObj = nil
+    GameManager.playerId = playerId
 
-local birthPoint = Vector3(GameManager.WIDTH / 2, GameManager.HEIGHT, 0)
+    local txtScore = GameObject.Find("UI").transform:Find("Score").gameObject
+    local offset = Vector3(0, 0, 0)
+    -- Blocks的子物体Block
+    local blockParent = terisGame.transform:Find("Blocks"):Find("Block").gameObject
+    local gameOverUI = GameObject.Find("GameOverUI").transform:Find("GameOverUI").gameObject
 
-function init()
-    for i = 1, GameManager.WIDTH do
-        GameManager.grid[i] = {}
+    local game = TerisGameManager.New(playerId, 0, 10, 22, txtScore, offset, blockParent, 1, gameOverUI)
+    games[playerId] = game
+
+    local len = opponentsId.Length
+    for i = 0, len - 1 do
+        local opponentId = opponentsId[i]
+        if (opponentId == "") then
+            return
+        end
+        GameManager.opponentsId[i + 1] = opponentId
+        local txtScore = GameObject.Find("UI").transform:Find(opponentsScoreObjectName[i + 1]).gameObject
+        local offset = opponentsOffset[i + 1]
+        local blockParent = terisGame.transform:Find("Blocks"):Find(opponentsBlockObjectName[i + 1]).gameObject
+        local gameOverUI = GameObject.Find("GameOverUI").transform:Find(gameOverUIObjectName[i + 1]).gameObject
+
+        local opponentGame = TerisGameManager.New(opponentId, 0, 10, 22, txtScore, offset, blockParent, 1, gameOverUI)
+        games[opponentId] = opponentGame
     end
-
-    --获取tag为"score"的物体
-    GameManager.txtScoreObj = GameObject.FindGameObjectWithTag("score")
 end
 
-function GameManager.clearCurrentObject()
-    currentObject = nil
-end
-
-function generateNewBlock()
-    currentObject = Teris.New(WebSocketClient.blockNumber, birthPoint, "Blocks")
-end
-
-function moveLeft()
-    if currentObject == nil then
+function gameOver(playerId)
+    print("游戏结束")
+    local game = games[playerId]
+    -- 记录游戏分数，显示游戏结束的UI，删除游戏对象
+    if game == nil then
+        print("找不到" .. playerId .. "的游戏")
         return
     end
-    currentObject:moveLeft()
+
+    GameManager.scores[playerId] = game.score
+    -- 从表中删除游戏对象
+    game:onGameOver()
+
+    local len = #GameManager.opponentsId + 1
+    local scoreNumber = 0
+    for k, v in pairs(GameManager.scores) do
+        scoreNumber = scoreNumber + 1
+    end
+
+    if scoreNumber == len then
+        -- 显示游戏结束的UI
+        local gameOverUI = GameObject.Find("GameOverUI").transform:Find("GameOver").gameObject
+        gameOverUI:SetActive(true)
+        local txtScore = gameOverUI.transform:Find("txtScore").gameObject
+        local result = ""
+        table.sort(GameManager.scores, function(a, b)
+            return a > b
+        end)
+        for k, v in pairs(GameManager.scores) do
+            result = result .. k .. " : " .. v .. "\n"
+        end
+        txtScore:GetComponent("Text").text = result
+        local btnContinue = GameObject.Find("GameOverUI").transform:Find("btnContinue").gameObject
+        btnContinue:SetActive(true)
+    end
 end
 
-function moveRight()
-    if currentObject == nil then
+function generateNewBlock(playerId, number)
+    local game = games[playerId]
+    if game == nil then
+        print("找不到" .. playerId .. "的游戏")
         return
     end
-    currentObject:moveRight()
+
+    if game.gameOver then
+        print("游戏结束，无法进行操作")
+        return
+    end
+
+    -- 生成新的方块
+    game:generateNewBlock(number)
 end
 
-function rotate()
-    if currentObject == nil then
+function moveLeft(playerId)
+    local game = games[playerId]
+    if game == nil then
+        print("找不到" .. playerId .. "的游戏")
         return
     end
-    currentObject:rotate()
+
+    if game.gameOver then
+        print("游戏结束，无法进行操作")
+        return
+    end
+
+    -- 移动方块到左边
+    game:moveLeft()
 end
 
-function drop()
-    if currentObject == nil then
+function moveRight(playerId)
+    local game = games[playerId]
+    if game == nil then
+        print("找不到" .. playerId .. "的游戏")
         return
     end
-    currentObject:drop()
+
+    if game.gameOver then
+        print("游戏结束，无法进行操作")
+        return
+    end
+
+    -- 移动方块到右边
+    game:moveRight()
 end
 
-function cancelDrop()
-    if currentObject == nil then
+function rotate(playerId)
+    local game = games[playerId]
+    if game == nil then
+        print("找不到" .. playerId .. "的游戏")
         return
     end
-    currentObject:cancelDrop()
+
+    if game.gameOver then
+        print("游戏结束，无法进行操作")
+        return
+    end
+
+    -- 旋转方块
+    game:rotate()
+end
+
+function drop(playerId)
+    local game = games[playerId]
+    if game == nil then
+        print("找不到" .. playerId .. "的游戏")
+        return
+    end
+
+    if game.gameOver then
+        print("游戏结束，无法进行操作")
+        return
+    end
+
+    -- 让方块掉落
+    game:drop()
+end
+
+function acc()
+    -- 方块加速掉落
+    local game = games[GameManager.playerId]
+    if game == nil then
+        print("找不到玩家游戏")
+        return
+    end
+
+    if game.gameOver then
+        print("游戏结束，无法进行操作")
+        return
+    end
+
+    -- 加速掉落
+    game:acc()
+end
+
+function cancelAcc()
+    -- 取消方块加速掉落
+    local game = games[GameManager.playerId]
+    if game == nil then
+        print("找不到玩家游戏")
+        return
+    end
+
+    if game.gameOver then
+        print("游戏结束，无法进行操作")
+        return
+    end
+
+    -- 取消加速掉落
+    game:cancelAcc()
 end
 
 function update()
-    if currentObject == nil then
+    -- 更新游戏状态
+    local game = games[GameManager.playerId]
+    if game == nil then
         return
     end
-    currentObject:update()
-end
 
-function GameManager.UpdateScore(lineCount)
-    if lineCount == 1 then
-        GameManager.score = GameManager.score + 100
-    elseif lineCount == 2 then
-        GameManager.score = GameManager.score + 300
-    elseif lineCount == 3 then
-        GameManager.score = GameManager.score + 500
-    elseif lineCount == 4 then
-        GameManager.score = GameManager.score + 800
+    if game.gameOver then
+        return
     end
-    --更新分数显示
-    GameManager.txtScoreObj:GetComponent("Text").text = "Score: " .. GameManager.score
+
+    -- 更新游戏状态
+    game:update()
 end
 
-function GameManager.CheckRow(row)
-    for x = 1, GameManager.WIDTH do
-        if GameManager.grid[x][row] == nil then
-            return false
-        end
-    end 
-    GameManager.ClearRow(row)
-    return true
-end
-
-function GameManager.ClearRow(row)
-    for y = row, GameManager.HEIGHT do
-        for x = 1, GameManager.WIDTH do
-            if y == row then
-                CS.UnityEngine.Object.Destroy(GameManager.grid[x][y].gameObject)
-            end
-            GameManager.grid[x][y] = GameManager.grid[x][y + 1]
-            if GameManager.grid[x][y] ~= nil then
-                GameManager.grid[x][y].transform.position = GameManager.grid[x][y].transform.position + Vector3(0, -1, 0)
-            end
-        end
+-- 对手特有，直接处理落地检查
+function onLand(playerId)
+    local game = games[playerId]
+    if game == nil then
+        print("找不到" .. playerId .. "的游戏")
+        return
     end
+
+    if game.gameOver then
+        print("游戏结束，无法进行操作")
+        return
+    end
+
+    -- 方块落地
+    game:onLand()
+end
+
+-- 对手特有，直接强制消除行
+function clearRow(playerId, rowNumber)
+    local game = games[playerId]
+    if game == nil then
+        print("找不到" .. playerId .. "的游戏")
+        return
+    end
+
+    if game.gameOver then
+        print("游戏结束，无法进行操作")
+        return
+    end
+
+    -- 清除行
+    game:checkRow(rowNumber)
 end
 
 return GameManager

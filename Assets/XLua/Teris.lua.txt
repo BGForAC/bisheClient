@@ -3,6 +3,7 @@ Teris = {}
 -- Teris类用于创建和管理俄罗斯方块的行为和状态
 -- 该类包含了方块的生成、移动、旋转、下落等功能
 -- 以及与游戏网格的交互
+-- 一个实例代表一个当前正在操作的方块
 
 local FAST = 0.1
 local SLOW = 0.5
@@ -21,7 +22,7 @@ end
 local dropTimer = Teris:currentDropSpeed()
 
 local blockNames = {"Teris_T", "Teris_Z", "Teris_S", "Teris_L", "Teris_J", "Teris_O", "Teris_I"}
-function Teris.New(num, birthPoint, parentName)
+function Teris.New(num, birthPoint, parent, manager)
     local self = {}
     setmetatable(self, {__index = Teris})
 
@@ -31,8 +32,8 @@ function Teris.New(num, birthPoint, parentName)
     self.gameObject = Instantiate(prefab)
     self.transform = self.gameObject.transform
     self.transform.position = birthPoint
-    local parent = GameObject.Find(parentName)
     self.transform.parent = parent.transform
+    self.manager = manager
 
     return self 
 end
@@ -40,11 +41,17 @@ end
 function Teris:moveLeft()
     -- 移动方块到左边
     self.transform.position = self.transform.position + Vector3(-1, 0, 0)
+    if self.manager.playerId ~= GameManager.playerId then
+        -- 如果不是当前玩家，则不进行后续操作
+        return
+    end
+
     -- 检查是否可以移动
     if not self:MoveAble() then
         -- 如果不能移动，则将方块移回原来的位置
         self.transform.position = self.transform.position + Vector3(1, 0, 0)
     else
+        -- 如果是当前玩家，则发送消息给服务器
         WebSocketClient.Send("left")
     end 
 end
@@ -52,6 +59,11 @@ end
 function Teris:moveRight()
     -- 移动方块到右边
     self.transform.position = self.transform.position + Vector3(1, 0, 0)
+    if self.manager.playerId ~= GameManager.playerId then
+        -- 如果不是当前玩家，则不进行后续操作
+        return
+    end
+
     -- 检查是否可以移动
     if not self:MoveAble() then
         -- 如果不能移动，则将方块移回原来的位置
@@ -64,6 +76,11 @@ end
 function Teris:rotate()
     -- 旋转方块
     self.transform:Rotate(0, 0, 90)
+    if self.manager.playerId ~= GameManager.playerId then
+        -- 如果不是当前玩家，则不进行后续操作
+        return
+    end
+
     -- 检查是否可以旋转
     if not self:MoveAble() then
         -- 如果不能旋转，则将方块旋转回原来的角度
@@ -73,19 +90,23 @@ function Teris:rotate()
     end
 end
 
-function Teris:drop()
+function Teris:acc()
     isDropping = true
 end
 
-function Teris:cancelDrop()
+function Teris:cancelAcc()
     isDropping = false
+end
+
+function Teris:drop()
+    self.transform.position = self.transform.position + Vector3(0, -1, 0)
 end
 
 function Teris:update()
     dropTimer = dropTimer - Time.deltaTime
     if dropTimer <= 0 then
         -- 每隔一段时间下落一次
-        self.transform.position = self.transform.position + Vector3(0, -1, 0)
+        self:drop()
         dropTimer = self:currentDropSpeed()
         -- 检查是否可以下落
         if not self:MoveAble() then
@@ -100,20 +121,23 @@ function Teris:update()
 end
 
 function Teris:onLand()
-    WebSocketClient.Send("land")
-    GameManager.clearCurrentObject()
     local checkedRows = {}
-    -- 遍历子物体
     for i = 0, self.transform.childCount - 1 do
         local child = self.transform:GetChild(i)
-        local x = math.floor(child.position.x + 0.5)
-        local y = math.floor(child.position.y + 0.5)
+        local x = math.floor(child.position.x + 0.5) - self.manager.offset.x
+        local y = math.floor(child.position.y + 0.5) - self.manager.offset.y
 
         table.insert(checkedRows, y)
         -- 将方块添加到网格中
-        GameManager.grid[x][y] = child.gameObject
+        self.manager.grid[x][y] = child.gameObject
+    end
+    if self.manager.playerId ~= GameManager.playerId then
+        -- 如果不是当前玩家，则不进行后续操作
+        return
     end
 
+    WebSocketClient.Send("land")
+    self.manager:clearCurrentObject()
     -- 将checkedRows降序排列
     table.sort(checkedRows, function(a, b) return a > b end)
     local clearedRowNum = 0
@@ -121,15 +145,12 @@ function Teris:onLand()
     for i = 1, #checkedRows do
         local row = checkedRows[i]
         -- 检查行是否满了
-        if GameManager.CheckRow(row) then
-            clearedRowNum = clearedRowNum + 1
-        end
+        self.manager:checkRow(row)
     end
 
-    if clearedRowNum > 0 then
-        WebSocketClient.Send("clear")
-        -- 如果有行被消除，则更新分数
-        GameManager.UpdateScore(clearedRowNum)
+    if self.manager.clearedRowNumber > 0 then
+        -- 如果有行被消除，则通知服务器
+        WebSocketClient.Send("check")
     end
 
     -- 生成新的方块
@@ -140,16 +161,16 @@ function Teris:MoveAble()
     -- 遍历子物体
     for i = 0, self.transform.childCount - 1 do
         local child = self.transform:GetChild(i)
-        local x = math.floor(child.position.x + 0.5)
-        local y = math.floor(child.position.y + 0.5)
+        local x = math.floor(child.position.x + 0.5) - self.manager.offset.x
+        local y = math.floor(child.position.y + 0.5) - self.manager.offset.y
 
         -- 检查是否越界
-        if x < 1 or x > GameManager.WIDTH or y < 1 then
+        if x < 1 or x > self.manager.WIDTH or y < 1 then
             return false
         end
 
         -- 检查是否与其他方块重叠
-        if GameManager.grid[x][y] ~= nil then
+        if self.manager.grid[x][y] ~= nil then
             return false
         end
     end

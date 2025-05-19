@@ -252,9 +252,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @MoveRight.started += instance.OnMoveRight;
             @MoveRight.performed += instance.OnMoveRight;
             @MoveRight.canceled += instance.OnMoveRight;
-            @Drop.started += instance.OnDrop;
-            @Drop.performed += instance.OnDrop;
-            @Drop.canceled += instance.OnDrop;
+            @Drop.started += instance.OnAcc;
+            @Drop.performed += instance.OnAcc;
+            @Drop.canceled += instance.OnAcc;
             @Rotate.started += instance.OnRotate;
             @Rotate.performed += instance.OnRotate;
             @Rotate.canceled += instance.OnRotate;
@@ -268,9 +268,9 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
             @MoveRight.started -= instance.OnMoveRight;
             @MoveRight.performed -= instance.OnMoveRight;
             @MoveRight.canceled -= instance.OnMoveRight;
-            @Drop.started -= instance.OnDrop;
-            @Drop.performed -= instance.OnDrop;
-            @Drop.canceled -= instance.OnDrop;
+            @Drop.started -= instance.OnAcc;
+            @Drop.performed -= instance.OnAcc;
+            @Drop.canceled -= instance.OnAcc;
             @Rotate.started -= instance.OnRotate;
             @Rotate.performed -= instance.OnRotate;
             @Rotate.canceled -= instance.OnRotate;
@@ -295,7 +295,7 @@ public partial class @InputActions: IInputActionCollection2, IDisposable
     {
         void OnMoveLeft(InputAction.CallbackContext context);
         void OnMoveRight(InputAction.CallbackContext context);
-        void OnDrop(InputAction.CallbackContext context);
+        void OnAcc(InputAction.CallbackContext context);
         void OnRotate(InputAction.CallbackContext context);
     }
 }

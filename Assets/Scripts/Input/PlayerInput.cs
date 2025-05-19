@@ -8,9 +8,9 @@ public class PlayerInput : MonoBehaviour, InputActions.IGamePlayActions
 {
     public static event UnityAction onMoveLeft = delegate { };
     public static event UnityAction onMoveRight = delegate { };
-    public static event UnityAction onDrop = delegate { };
+    public static event UnityAction onAcc = delegate { };
     public static event UnityAction onRotate = delegate { };
-    public static event UnityAction onCancelDrop = delegate { };
+    public static event UnityAction onCancelAcc = delegate { };
 
     static InputActions inputActions;
 
@@ -40,15 +40,15 @@ public class PlayerInput : MonoBehaviour, InputActions.IGamePlayActions
         inputActions.GamePlay.Disable();
     }
 
-    public void OnDrop(InputAction.CallbackContext context)
+    public void OnAcc(InputAction.CallbackContext context)
     {
         if (context.performed)
         {
-            onDrop?.Invoke();
+            onAcc?.Invoke();
         }
         if (context.canceled)
         {
-            onCancelDrop?.Invoke();
+            onCancelAcc?.Invoke();
         }
     }
 

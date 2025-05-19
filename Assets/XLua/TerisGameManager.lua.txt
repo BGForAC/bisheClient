@@ -1,0 +1,144 @@
+local currentObject = nil
+
+TerisGameManager = {}
+
+function TerisGameManager.New(playerId, baseScore, width, height, txtScore, offset, blockParent, scoreRate, gameOverUI)
+    local self = {}
+    setmetatable(self, { __index = TerisGameManager })
+
+    self.grid = {}
+    self.score = baseScore
+    self.WIDTH = width
+    self.HEIGHT = height
+    for i = 1, self.WIDTH do
+        self.grid[i] = {}
+    end
+
+    self.currentObject = nil
+    self.txtScore = txtScore
+    self.offset = offset
+    self.birthPoint = Vector3(self.WIDTH / 2 + offset.x, self.HEIGHT + offset.y, offset.z)
+    self.blockParent = blockParent
+    self.playerId = playerId
+    self.scoreRate = scoreRate
+    self.gameOverUI = gameOverUI
+    self.gameOver = false
+
+    self.clearedRowNumber = 0
+    
+    self.txtScore:GetComponent("Text").text = playerId .. ": " .. self.score
+
+    return self
+end
+
+function TerisGameManager:onGameOver()
+    self.gameOverUI:SetActive(true)
+    self.gameOver = true
+end
+
+function TerisGameManager:clearCurrentObject()
+    self.currentObject = nil
+end
+
+function TerisGameManager:generateNewBlock(number)
+    self.currentObject = Teris.New(number, self.birthPoint, self.blockParent, self)
+    self:updateScore(self.clearedRowNumber)
+    self.clearedRowNumber = 0
+end
+
+function TerisGameManager:moveLeft()
+    if self.currentObject == nil then
+        return
+    end
+    self.currentObject:moveLeft()
+end
+
+function TerisGameManager:moveRight()
+    if self.currentObject == nil then
+        return
+    end
+    self.currentObject:moveRight()
+end
+
+function TerisGameManager:rotate()
+    if self.currentObject == nil then
+        return
+    end
+    self.currentObject:rotate()
+end
+
+function TerisGameManager:drop()
+    if self.currentObject == nil then
+        return
+    end
+    self.currentObject:drop()
+end
+
+function TerisGameManager:acc()
+    if self.currentObject == nil then
+        return
+    end
+    self.currentObject:acc()
+end
+
+function TerisGameManager:cancelAcc()
+    if self.currentObject == nil then
+        return
+    end
+    self.currentObject:cancelAcc()
+end
+
+function TerisGameManager:update()
+    if self.currentObject == nil then
+        return
+    end
+    self.currentObject:update()
+end
+
+function TerisGameManager:updateScore(lineCount)
+    if lineCount == 1 then
+        self.score = (self.score + 100) * self.scoreRate
+    elseif lineCount == 2 then
+        self.score = (self.score + 300) * self.scoreRate
+    elseif lineCount == 3 then
+        self.score = (self.score + 500) * self.scoreRate
+    elseif lineCount == 4 then
+        self.score = (self.score + 800) * self.scoreRate
+    end
+    --更新分数显示
+    self.txtScore:GetComponent("Text").text = self.playerId .. ": " .. self.score
+end
+
+function TerisGameManager:onLand()
+    if self.currentObject == nil then
+        return
+    end
+    self.currentObject:onLand()
+end
+
+function TerisGameManager:checkRow(row)
+    for x = 1, self.WIDTH do
+        if self.grid[x][row] == nil then
+            return false
+        end
+    end 
+    self:clearRow(row)
+    self.clearedRowNumber = self.clearedRowNumber + 1
+    return true
+end
+
+function TerisGameManager:clearRow(row)
+    for y = row, self.HEIGHT do
+        for x = 1, self.WIDTH do
+            if y == row then
+                CS.UnityEngine.Object.Destroy(self.grid[x][y].gameObject)
+            end
+            self.grid[x][y] = self.grid[x][y + 1]
+            if self.grid[x][y] ~= nil then
+                self.grid[x][y].transform.position = self.grid[x][y].transform.position + Vector3(0, -1, 0)
+            end
+        end
+    end
+end
+
+return TerisGameManager

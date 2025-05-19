@@ -10,34 +10,100 @@ public class GameManager : MonoBehaviour
     internal static LuaEnv luaEnv = new LuaEnv();
     public TextAsset luaGlobalScript;
     public TextAsset luaTerisScript;
-    public TextAsset luaETerisScript;
+    public TextAsset luaTerisGameManagerScript;
     public TextAsset luaGameManagerScript;
-    public TextAsset luaEGameManagerScript;
 
     private LuaTable scriptScopeTable;
 
-    private Action luaMoveLeft;
-    private Action luaMoveRight;
-    private Action luaDrop;
-    private Action luaCancelDrop;
-    private Action luaRotate;
-    private Action luaUpdate;
-    private Action luaInit;
-    public static Action luaGenrateNewBlock;
+    private static Action<string> luaMoveLeft;
+    private static Action<string> luaMoveRight;
+    private static Action luaAcc;
+    private static Action luaCancelAcc;
+    private static Action<string> luaDrop;
+    private static Action<string> luaRotate;
+    private static Action luaUpdate;
+    public static Action<string, int> luaGenrateNewBlock;
+    private static Action<string, string[]> luaInit;
+    private static Action<string> luaOnLand;
+    private static Action<string, int> luaClearRow;
+    private static Action<string> luaGameOver;
 
-    public static Action luaEMoveLeft;
-    public static Action luaEMoveRight;
-    public static Action luaEDrop;
-    public static Action luaERotate;
-    public static Action luaEClearRow;
-    public static Action luaEGenerateNewBlock;
-    public static Action luaEOnLand;
-    private Action luaEInit;
+    public static string account;
 
+    private static GameObject loginPanel;
+    private static GameObject accountInputField;
+    private static GameObject loginButton;
+    private static GameObject waitPanel;
+    private static GameObject waitName;
+    private static GameObject waitButton;
+    private static GameObject waitButtonTxt;
+
+    void BtnLogin()
+    {
+        account = accountInputField.GetComponent<UnityEngine.UI.InputField>().text;
+        if (string.IsNullOrEmpty(account))
+        {
+            Debug.Log("请输入账号");
+            return;
+        }
+        WebSocketClient.Send("login " + account);
+    }
+
+    static void BtnStartMatch()
+    {
+        WebSocketClient.Send("start match");
+        waitButton.GetComponent<UnityEngine.UI.Button>().onClick.RemoveListener(BtnStartMatch);
+        waitButton.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(BtnCancelMatch);
+        waitButtonTxt.GetComponent<UnityEngine.UI.Text>().text = "取消匹配";
+    }
+
+    static void BtnCancelMatch()
+    {
+        WebSocketClient.Send("cancel match");
+        waitButton.GetComponent<UnityEngine.UI.Button>().onClick.RemoveListener(BtnCancelMatch);
+        waitButton.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(BtnStartMatch);
+        waitButtonTxt.GetComponent<UnityEngine.UI.Text>().text = "开始匹配";
+    }
+
+    public static void LoginSuccess()
+    {
+        loginPanel.SetActive(false);
+        waitPanel.SetActive(true);
+        waitName.GetComponent<UnityEngine.UI.Text>().text = "玩家：" + account;
+        waitButton.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(BtnStartMatch);
+        print("玩家：" + account + " 登录成功");
+    }
+    
+    public static void LoginFailed()
+    {
+    }
+
+    public static void MatchSuccess(string[] opponentIds)
+    {
+        waitPanel.SetActive(false);
+        print("匹配成功，对手ID：" + string.Join(", ", opponentIds));
+        luaInit?.Invoke(account, opponentIds);
+
+        PlayerInput.onMoveLeft += CMoveLeft;
+        PlayerInput.onMoveRight += CMoveRight;
+        PlayerInput.onAcc += CAcc;
+        PlayerInput.onCancelAcc += CCancelAcc;
+        PlayerInput.onRotate += CRotate;    
+    }
 
     void OnEnable()
     {
+        Application.runInBackground = true;
         WebSocketClient.Connect();
+        loginPanel = GameObject.Find("UI").transform.Find("LoginPanel").gameObject;
+        accountInputField = loginPanel.transform.Find("trsContent").Find("inputName").gameObject;
+        loginButton = loginPanel.transform.Find("trsContent").Find("btnLogin").gameObject;
+        waitPanel = GameObject.Find("UI").transform.Find("WaitPanel").gameObject;
+        waitName = waitPanel.transform.Find("trsContent").Find("txtName").gameObject;
+        waitButton = waitPanel.transform.Find("trsContent").Find("btnMatch").gameObject;
+        waitButtonTxt = waitButton.transform.Find("txtMatch").gameObject;
+        // 为按钮注册点击事件
+        loginButton.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(BtnLogin);
         scriptScopeTable = luaEnv.NewTable();
 
         using (LuaTable meta = luaEnv.NewTable())
@@ -46,109 +112,100 @@ public class GameManager : MonoBehaviour
             scriptScopeTable.SetMetaTable(meta);
         }
 
-        PlayerInput.onMoveLeft += MoveLeft;
-        PlayerInput.onMoveRight += MoveRight;
-        PlayerInput.onDrop += Drop;
-        PlayerInput.onCancelDrop += CancelDrop;
-        PlayerInput.onRotate += Rotate;    
-
         luaEnv.DoString(luaGlobalScript.text, luaGlobalScript.name, scriptScopeTable);
         luaEnv.DoString(luaTerisScript.text, luaTerisScript.name, scriptScopeTable);
-        luaEnv.DoString(luaETerisScript.text, luaETerisScript.name, scriptScopeTable);
+        luaEnv.DoString(luaTerisGameManagerScript.text, luaTerisGameManagerScript.name, scriptScopeTable);
         luaEnv.DoString(luaGameManagerScript.text, luaGameManagerScript.name, scriptScopeTable);
-        luaEnv.DoString(luaEGameManagerScript.text, luaEGameManagerScript.name, scriptScopeTable);
 
         scriptScopeTable.Get("moveLeft", out luaMoveLeft);
         scriptScopeTable.Get("moveRight", out luaMoveRight);
         scriptScopeTable.Get("drop", out luaDrop);
-        scriptScopeTable.Get("cancelDrop", out luaCancelDrop);
         scriptScopeTable.Get("rotate", out luaRotate);
         scriptScopeTable.Get("update", out luaUpdate);
         scriptScopeTable.Get("generateNewBlock", out luaGenrateNewBlock);
-
-        scriptScopeTable.Get("eMoveLeft", out luaEMoveLeft);
-        scriptScopeTable.Get("eMoveRight", out luaEMoveRight);
-        scriptScopeTable.Get("eDrop", out luaEDrop);
-        scriptScopeTable.Get("eRotate", out luaERotate);
-        scriptScopeTable.Get("eClearRow", out luaEClearRow);
-        scriptScopeTable.Get("eGenerateNewBlock", out luaEGenerateNewBlock);
-        scriptScopeTable.Get("eOnLand", out luaEOnLand);
+        scriptScopeTable.Get("onLand", out luaOnLand);
+        scriptScopeTable.Get("clearRow", out luaClearRow);
+        scriptScopeTable.Get("acc", out luaAcc);
+        scriptScopeTable.Get("cancelAcc", out luaCancelAcc);
+        scriptScopeTable.Get("gameOver", out luaGameOver);
 
         scriptScopeTable.Get("init", out luaInit);
-        scriptScopeTable.Get("eInit", out luaEInit);
-
-        luaInit?.Invoke();
-        luaEInit?.Invoke();
     }
 
-    void MoveLeft()
+    private static void CMoveLeft()
     {
-        luaMoveLeft?.Invoke();
+        MoveLeft(account);
+    }
+    private static void CMoveRight()
+    {
+        MoveRight(account);
+    }
+    private static void CAcc()
+    {
+        luaAcc?.Invoke();
     }
 
-    void MoveRight()
+    private static void CCancelAcc()
     {
-        luaMoveRight?.Invoke();
+        luaCancelAcc?.Invoke();
     }
 
-    void Drop()
+    private static void CRotate()
     {
-        luaDrop?.Invoke();
+        luaRotate?.Invoke(account);
     }
 
-    void CancelDrop()
+    public static void GameOver(string playerId)
     {
-        luaCancelDrop?.Invoke();
+        luaGameOver?.Invoke(playerId);
+        if (playerId == account)
+        {
+            PlayerInput.onMoveLeft -= CMoveLeft;
+            PlayerInput.onMoveRight -= CMoveRight;
+            PlayerInput.onAcc -= CAcc;
+            PlayerInput.onCancelAcc -= CCancelAcc;
+            PlayerInput.onRotate -= CRotate;
+        }
     }
 
-    void Rotate()
+    public static void MoveLeft(string playerId)
     {
-        luaRotate?.Invoke();
+        luaMoveLeft?.Invoke(playerId);
+    }
+
+    public static void MoveRight(string playerId)
+    {
+        luaMoveRight?.Invoke(playerId);
+    }
+
+    public static void Drop(string playerId)
+    {
+        luaDrop?.Invoke(playerId);
+    }
+
+    public static void Rotate(string playerId)
+    {
+        luaRotate?.Invoke(playerId);
+    }
+
+    public static void OnLand(string playerId)
+    {
+        luaOnLand?.Invoke(playerId);
+    }
+
+    public static void ClearRow(string playerId, int rowNumber)
+    {
+        luaClearRow?.Invoke(playerId, rowNumber);
     }
 
     void Update()
     {
         MainThreadDispatcher.Update();
-        luaUpdate?.Invoke(); 
+        luaUpdate?.Invoke();
     }
 
-    public static void GenerateNewBlock()
+    public static void GenerateNewBlock(string playerId, int number)
     {
-        luaGenrateNewBlock?.Invoke();
-    }
-
-    internal static void EMoveLeft()
-    {
-        luaEMoveLeft?.Invoke();
-    }
-
-    internal static void EMoveRight()
-    {
-        luaEMoveRight?.Invoke();
-    }
-
-    internal static void EDrop()
-    {
-        luaEDrop?.Invoke();
-    }
-
-    internal static void ERotate()
-    {
-        luaERotate?.Invoke();
-    }
-
-    internal static void EClearRow()
-    {
-        luaEClearRow?.Invoke();
-    }
-
-    internal static void EGenerateNewBlock()
-    {
-        luaEGenerateNewBlock?.Invoke();
-    }
-
-    internal static void EOnLand()
-    {
-        luaEOnLand?.Invoke();
+        luaGenrateNewBlock?.Invoke(playerId, number);
     }
 }

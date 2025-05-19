@@ -6,13 +6,9 @@ using XLua;
 public class WebSocketClient : MonoBehaviour
 {
     private static WebSocket ws;
-    public static int blockNumber = -1;
-    public static int eBlockNumber = -1;
-    public static int eRowNumber = -1;
 
     public static void Connect()
     {
-        // Connect to the WebSocket server
         ws = new WebSocket("ws://localhost:8080/ws");
 
         ws.OnMessage += (sender, e) =>
@@ -21,14 +17,25 @@ public class WebSocketClient : MonoBehaviour
             {
                 switch (e.Data)
                 {
+                    case "login success":
+                        GameManager.LoginSuccess();
+                        break;
+                    case "login failed":
+                        GameManager.LoginFailed();
+                        break;
+                    case "game over":
+                        GameManager.GameOver(GameManager.account);
+                        break;
+                    case string message when message.StartsWith("match success "):
+                        string[] parts = message.Split(' ');
+                        string[] opponentIds = parts[2].Split(',');
+                        GameManager.MatchSuccess(opponentIds);
+                        break; 
                     case string message when message.StartsWith("teris:"):
-                        blockNumber = int.Parse(message.Substring(6));
-                        GameManager.GenerateNewBlock();
+                        int blockNumber = int.Parse(message.Substring(6));
+                        GameManager.GenerateNewBlock(GameManager.account, blockNumber);
                         break;
-                    case "gameOver":
-                        GameManager.GameOver()
-                        break;
-                    case string message when message.StartsWith("e "):
+                    case string message when message.StartsWith("* "):
                         reactTo(message.Substring(2));
                         break;
                     default:
@@ -36,38 +43,40 @@ public class WebSocketClient : MonoBehaviour
                         break;
                 }
 
-                void reactTo(string message)
+                void reactTo(string msg)
                 {
-                    switch (message)
+                    string playerId = msg.Split(' ')[0];
+                    string action = msg.Split(' ')[1];
+                    switch (action)
                     {
                         case "gameOver":
-                            GameManager.EGameOver();
+                            GameManager.GameOver(playerId);
                             break;
                         case "moveLeft":
-                            GameManager.EMoveLeft();
+                            GameManager.MoveLeft(playerId);
                             break;
                         case "moveRight":
-                            GameManager.EMoveRight();
+                            GameManager.MoveRight(playerId);
                             break;
                         case "drop":
-                            GameManager.EDrop();
+                            GameManager.Drop(playerId);
                             break;
                         case "rotate":
-                            GameManager.ERotate();
+                            GameManager.Rotate(playerId);
                             break;
                         case "onLand":
-                            GameManager.EOnLand();
-                            break;    
+                            GameManager.OnLand(playerId);
+                            break;
                         case string msg1 when msg1.StartsWith("clearRow:"):
-                            eRowNumber = int.Parse(msg1.Substring(9));
-                            GameManager.EClearRow();
+                            int rowNumber = int.Parse(msg1.Substring(9));
+                            GameManager.ClearRow(playerId, rowNumber);
                             break;
                         case string msg2 when msg2.StartsWith("teris:"):
-                            eBlockNumber = int.Parse(msg2.Substring(6));
-                            GameManager.EGenerateNewBlock();
+                            int blockNumber = int.Parse(msg2.Substring(6));
+                            GameManager.GenerateNewBlock(playerId, blockNumber);
                             break;
                         default:
-                            Debug.Log("Unknown message: " + message);
+                            Debug.Log("Unknown action: " + action);
                             break;
                     }
                 }
@@ -87,7 +96,6 @@ public class WebSocketClient : MonoBehaviour
 
     void OnDestroy()
     {
-        // Close the WebSocket connection
         if (ws != null)
         {
             ws.Close();
