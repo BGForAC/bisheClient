@@ -127,6 +127,12 @@ function TerisGameManager:checkRow(row)
     return true
 end
 
+function TerisGameManager:clearAllBlocks()
+    for k, v in pairs(self.blockParent.transform) do
+        CS.UnityEngine.Object.Destroy(v.gameObject)
+    end
+end
+
 function TerisGameManager:clearRow(row)
     for y = row, self.HEIGHT do
         for x = 1, self.WIDTH do

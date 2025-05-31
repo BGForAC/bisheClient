@@ -76,6 +76,31 @@ function gameOver(playerId)
         txtScore:GetComponent("Text").text = result
         local btnContinue = GameObject.Find("GameOverUI").transform:Find("btnContinue").gameObject
         btnContinue:SetActive(true)
+        btnContinue.gameObject:GetComponent("Button").onClick:AddListener(function()
+            -- 回到等待界面，隐藏游戏界面和游戏结束界面
+            gameOverUI:SetActive(false)
+
+            GameManager.terisGame.transform:Find("Frames").gameObject:SetActive(false)
+            local txtScore = GameObject.Find("UI").transform:Find("Score").gameObject
+            txtScore:SetActive(false)
+            local gameOverUI = GameObject.Find("GameOverUI").transform:Find("GameOverUI").gameObject
+            gameOverUI:SetActive(false)
+            for i = 0, len - 1 do
+                local txtScore = GameObject.Find("UI").transform:Find(opponentsScoreObjectName[i + 1]).gameObject
+                txtScore:SetActive(false) 
+                local gameOverUI = GameObject.Find("GameOverUI").transform:Find(gameOverUIObjectName[i + 1]).gameObject
+                gameOverUI:SetActive(false)
+            end
+            for k, v in pairs(games) do
+                v:clearAllBlocks()
+            end
+            games = {}
+            GameManager.scores = {}
+
+            local waitPanel = GameObject.Find("UI").transform:Find("WaitPanel").gameObject
+            waitPanel:SetActive(true)
+            btnContinue:SetActive(false)
+        end)
     end
 end
 

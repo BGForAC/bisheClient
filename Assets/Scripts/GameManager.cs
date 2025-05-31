@@ -3,11 +3,15 @@ using System.Collections.Generic;
 using XLua;
 using UnityEngine;
 using System;
+using UnityEngine.UIElements;
 
 [CSharpCallLua]
 public class GameManager : MonoBehaviour
 {
-    internal static LuaEnv luaEnv = new LuaEnv();
+
+    public static GameManager Instance { get; private set; }
+
+    internal LuaEnv luaEnv = new LuaEnv();
     public TextAsset luaGlobalScript;
     public TextAsset luaTerisScript;
     public TextAsset luaTerisGameManagerScript;
@@ -15,28 +19,29 @@ public class GameManager : MonoBehaviour
 
     private LuaTable scriptScopeTable;
 
-    private static Action<string> luaMoveLeft;
-    private static Action<string> luaMoveRight;
-    private static Action luaAcc;
-    private static Action luaCancelAcc;
-    private static Action<string> luaDrop;
-    private static Action<string> luaRotate;
-    private static Action luaUpdate;
-    public static Action<string, int> luaGenrateNewBlock;
-    private static Action<string, string[]> luaInit;
-    private static Action<string> luaOnLand;
-    private static Action<string, int> luaClearRow;
-    private static Action<string> luaGameOver;
+    private Action<string> luaMoveLeft;
+    private Action<string> luaMoveRight;
+    private Action luaAcc;
+    private Action luaCancelAcc;
+    private Action<string> luaDrop;
+    private Action<string> luaRotate;
+    private Action luaUpdate;
+    public Action<string, int> luaGenrateNewBlock;
+    private Action<string, string[]> luaInit;
+    private Action<string> luaOnLand;
+    private Action<string, int> luaClearRow;
+    private Action<string> luaGameOver;
 
-    public static string account;
+    public string account;
 
-    private static GameObject loginPanel;
-    private static GameObject accountInputField;
-    private static GameObject loginButton;
-    private static GameObject waitPanel;
-    private static GameObject waitName;
-    private static GameObject waitButton;
-    private static GameObject waitButtonTxt;
+    private GameObject loginPanel;
+    private GameObject accountInputField;
+    private GameObject loginButton;
+    private GameObject waitPanel;
+    private GameObject waitName;
+    private GameObject waitButton;
+    private GameObject waitButtonTxt;
+    private GameObject connectStateTxt;
 
     void BtnLogin()
     {
@@ -49,7 +54,7 @@ public class GameManager : MonoBehaviour
         WebSocketClient.Send("login " + account);
     }
 
-    static void BtnStartMatch()
+    void BtnStartMatch()
     {
         WebSocketClient.Send("start match");
         waitButton.GetComponent<UnityEngine.UI.Button>().onClick.RemoveListener(BtnStartMatch);
@@ -57,7 +62,7 @@ public class GameManager : MonoBehaviour
         waitButtonTxt.GetComponent<UnityEngine.UI.Text>().text = "取消匹配";
     }
 
-    static void BtnCancelMatch()
+    void BtnCancelMatch()
     {
         WebSocketClient.Send("cancel match");
         waitButton.GetComponent<UnityEngine.UI.Button>().onClick.RemoveListener(BtnCancelMatch);
@@ -65,7 +70,7 @@ public class GameManager : MonoBehaviour
         waitButtonTxt.GetComponent<UnityEngine.UI.Text>().text = "开始匹配";
     }
 
-    public static void LoginSuccess()
+    public void LoginSuccess()
     {
         loginPanel.SetActive(false);
         waitPanel.SetActive(true);
@@ -73,12 +78,12 @@ public class GameManager : MonoBehaviour
         waitButton.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(BtnStartMatch);
         print("玩家：" + account + " 登录成功");
     }
-    
-    public static void LoginFailed()
+
+    public void LoginFailed()
     {
     }
 
-    public static void MatchSuccess(string[] opponentIds)
+    public void MatchSuccess(string[] opponentIds)
     {
         waitPanel.SetActive(false);
         print("匹配成功，对手ID：" + string.Join(", ", opponentIds));
@@ -88,22 +93,43 @@ public class GameManager : MonoBehaviour
         PlayerInput.onMoveRight += CMoveRight;
         PlayerInput.onAcc += CAcc;
         PlayerInput.onCancelAcc += CCancelAcc;
-        PlayerInput.onRotate += CRotate;    
+        PlayerInput.onRotate += CRotate;
+
+        waitButton.GetComponent<UnityEngine.UI.Button>().onClick.RemoveListener(BtnCancelMatch);
+        waitButton.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(BtnStartMatch);
+        waitButtonTxt.GetComponent<UnityEngine.UI.Text>().text = "开始匹配";
+    }
+
+    void Awake()
+    {
+        Instance = this;
     }
 
     void OnEnable()
     {
-        Application.runInBackground = true;
-        WebSocketClient.Connect();
+        Screen.SetResolution(640, 360, false);
         loginPanel = GameObject.Find("UI").transform.Find("LoginPanel").gameObject;
         accountInputField = loginPanel.transform.Find("trsContent").Find("inputName").gameObject;
         loginButton = loginPanel.transform.Find("trsContent").Find("btnLogin").gameObject;
+        connectStateTxt = loginPanel.transform.Find("trsContent").Find("txtConnectState").gameObject;
         waitPanel = GameObject.Find("UI").transform.Find("WaitPanel").gameObject;
         waitName = waitPanel.transform.Find("trsContent").Find("txtName").gameObject;
         waitButton = waitPanel.transform.Find("trsContent").Find("btnMatch").gameObject;
         waitButtonTxt = waitButton.transform.Find("txtMatch").gameObject;
+
+        Application.runInBackground = true;
+        loginButton.GetComponent<UnityEngine.UI.Button>().interactable = false;
+
+        WebSocketClient.Connect();
+    }
+
+    public void Init()
+    {
         // 为按钮注册点击事件
+        loginButton.GetComponent<UnityEngine.UI.Button>().interactable = true;
         loginButton.GetComponent<UnityEngine.UI.Button>().onClick.AddListener(BtnLogin);
+        connectStateTxt.GetComponent<UnityEngine.UI.Text>().text = "连接状态：已连接";
+
         scriptScopeTable = luaEnv.NewTable();
 
         using (LuaTable meta = luaEnv.NewTable())
@@ -132,30 +158,30 @@ public class GameManager : MonoBehaviour
         scriptScopeTable.Get("init", out luaInit);
     }
 
-    private static void CMoveLeft()
+    private void CMoveLeft()
     {
         MoveLeft(account);
     }
-    private static void CMoveRight()
+    private void CMoveRight()
     {
         MoveRight(account);
     }
-    private static void CAcc()
+    private void CAcc()
     {
         luaAcc?.Invoke();
     }
 
-    private static void CCancelAcc()
+    private void CCancelAcc()
     {
         luaCancelAcc?.Invoke();
     }
 
-    private static void CRotate()
+    private void CRotate()
     {
         luaRotate?.Invoke(account);
     }
 
-    public static void GameOver(string playerId)
+    public void GameOver(string playerId)
     {
         luaGameOver?.Invoke(playerId);
         if (playerId == account)
@@ -168,32 +194,32 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    public static void MoveLeft(string playerId)
+    public void MoveLeft(string playerId)
     {
         luaMoveLeft?.Invoke(playerId);
     }
 
-    public static void MoveRight(string playerId)
+    public void MoveRight(string playerId)
     {
         luaMoveRight?.Invoke(playerId);
     }
 
-    public static void Drop(string playerId)
+    public void Drop(string playerId)
     {
         luaDrop?.Invoke(playerId);
     }
 
-    public static void Rotate(string playerId)
+    public void Rotate(string playerId)
     {
         luaRotate?.Invoke(playerId);
     }
 
-    public static void OnLand(string playerId)
+    public void OnLand(string playerId)
     {
         luaOnLand?.Invoke(playerId);
     }
 
-    public static void ClearRow(string playerId, int rowNumber)
+    public void ClearRow(string playerId, int rowNumber)
     {
         luaClearRow?.Invoke(playerId, rowNumber);
     }
@@ -204,7 +230,7 @@ public class GameManager : MonoBehaviour
         luaUpdate?.Invoke();
     }
 
-    public static void GenerateNewBlock(string playerId, int number)
+    public void GenerateNewBlock(string playerId, int number)
     {
         luaGenrateNewBlock?.Invoke(playerId, number);
     }
